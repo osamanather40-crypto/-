@@ -1,0 +1,204 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: default deny everything
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId == request.auth.uid && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             data.sovereigntyScore is int && data.sovereigntyScore >= 0 && data.sovereigntyScore <= 1000 &&
+             data.zeroBreachStreak is int && data.zeroBreachStreak >= 0 && data.zeroBreachStreak <= 10000 &&
+             data.timeDebtMinutes is int && data.timeDebtMinutes >= 0 && data.timeDebtMinutes <= 100000 &&
+             data.completedCount is int && data.completedCount >= 0 && data.completedCount <= 1000000 &&
+             data.breachCount is int && data.breachCount >= 0 && data.breachCount <= 1000000 &&
+             (!('sealedContractDate' in data) || (data.sealedContractDate is string && data.sealedContractDate.size() <= 16)) &&
+             (!('restrictedMode' in data) || data.restrictedMode is bool) &&
+             (!('restrictionReason' in data) || (data.restrictionReason is string && data.restrictionReason.size() <= 200)) &&
+             (!('witnessName' in data) || (data.witnessName is string && data.witnessName.size() <= 80)) &&
+             (!('witnessPhone' in data) || (data.witnessPhone is string && data.witnessPhone.size() <= 24)) &&
+             (!('autoWhatsApp' in data) || data.autoWhatsApp is bool);
+    }
+
+    function isValidQaydTask(data) {
+      return data.userId is string && data.userId == request.auth.uid && data.userId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.description is string && data.description.size() <= 300 &&
+             data.orderIndex is int && data.orderIndex >= 0 && data.orderIndex <= 500 &&
+             data.durationMinutes is int && data.durationMinutes >= 1 && data.durationMinutes <= 1440 &&
+             data.proofType in ['PHOTO_PROOF', 'PRESS_OATH', 'STILLNESS_MONK', 'KINETIC_MOTION', 'VISUAL_EVIDENCE'] &&
+             data.status in ['DRAFT', 'SEALED', 'ACTIVE', 'COMPLETED', 'BREACHED'] &&
+             data.contractDate is string && data.contractDate.size() >= 1 && data.contractDate.size() <= 16 &&
+             (!('targetTimeLabel' in data) || (data.targetTimeLabel is string && data.targetTimeLabel.size() <= 32)) &&
+             data.targetEffort is int && data.targetEffort >= 1 && data.targetEffort <= 36000 &&
+             data.deadlineEpochMs is int && data.deadlineEpochMs >= 0 &&
+             (!('proofSummary' in data) || (data.proofSummary is string && data.proofSummary.size() <= 300)) &&
+             (!('proofPhotoUri' in data) || (data.proofPhotoUri is string && data.proofPhotoUri.size() <= 500)) &&
+             data.debtPenaltyMinutes is int && data.debtPenaltyMinutes >= 0 && data.debtPenaltyMinutes <= 10000 &&
+             data.recoveryTask is bool &&
+             (!('penaltyApplied' in data) || data.penaltyApplied is bool);
+    }
+
+    function isValidLedgerEntry(data) {
+      return data.userId is string && data.userId == request.auth.uid && data.userId.size() <= 128 &&
+             data.taskId is string && data.taskId.size() >= 1 && data.taskId.size() <= 128 &&
+             data.taskTitle is string && data.taskTitle.size() >= 1 && data.taskTitle.size() <= 120 &&
+             data.eventType in ['CONTRACT_SEALED', 'TASK_COMPLETED', 'TASK_BREACHED', 'DEBT_REPAID', 'FORCE_MAJEURE'] &&
+             data.proofType in ['PHOTO_PROOF', 'PRESS_OATH', 'STILLNESS_MONK', 'KINETIC_MOTION', 'VISUAL_EVIDENCE', 'SYSTEM'] &&
+             data.proofNote is string && data.proofNote.size() <= 300 &&
+             (!('proofPhotoUri' in data) || (data.proofPhotoUri is string && data.proofPhotoUri.size() <= 500)) &&
+             data.scoreDelta is int && data.scoreDelta >= -500 && data.scoreDelta <= 500 &&
+             data.debtMinutesDelta is int && data.debtMinutesDelta >= -10000 && data.debtMinutesDelta <= 10000;
+    }
+
+    // 1. User Discipline Profile
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+
+      allow create: if isValidId(userId) &&
+                       isOwner(userId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'displayName', 'sovereigntyScore', 'zeroBreachStreak',
+                         'timeDebtMinutes', 'completedCount', 'breachCount', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'displayName', 'sovereigntyScore', 'zeroBreachStreak',
+                         'timeDebtMinutes', 'completedCount', 'breachCount', 'sealedContractDate',
+                         'restrictedMode', 'restrictionReason', 'witnessName', 'witnessPhone',
+                         'autoWhatsApp', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isValidId(userId) &&
+                       isOwner(userId) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'displayName', 'sovereigntyScore', 'zeroBreachStreak',
+                         'timeDebtMinutes', 'completedCount', 'breachCount',
+                         'sealedContractDate', 'restrictedMode', 'restrictionReason',
+                         'witnessName', 'witnessPhone', 'autoWhatsApp', 'updatedAt'
+                       ]);
+
+      allow delete: if false;
+
+      // 2. Mandatory Sequential Tasks
+      match /tasks/{taskId} {
+        allow get: if isValidId(userId) && isValidId(taskId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId);
+
+        allow create: if isValidId(userId) &&
+                         isValidId(taskId) &&
+                         isOwner(userId) &&
+                         incoming().status in ['DRAFT', 'SEALED', 'ACTIVE'] &&
+                         incoming().keys().hasAll([
+                           'userId', 'title', 'description', 'orderIndex', 'durationMinutes',
+                           'proofType', 'status', 'contractDate', 'targetEffort',
+                           'deadlineEpochMs', 'debtPenaltyMinutes', 'recoveryTask',
+                           'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'title', 'description', 'orderIndex', 'durationMinutes',
+                           'proofType', 'status', 'contractDate', 'targetTimeLabel', 'targetEffort',
+                           'deadlineEpochMs', 'proofSummary', 'proofPhotoUri', 'debtPenaltyMinutes',
+                           'recoveryTask', 'penaltyApplied', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         isValidQaydTask(incoming());
+
+        allow update: if isValidId(userId) &&
+                         isValidId(taskId) &&
+                         isOwner(userId) &&
+                         isValidQaydTask(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         !(existing().status in ['COMPLETED', 'BREACHED']) &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         (
+                           (existing().status == 'DRAFT' &&
+                            incoming().status == 'DRAFT' &&
+                            incoming().diff(existing()).affectedKeys().hasOnly([
+                              'title', 'description', 'orderIndex', 'durationMinutes',
+                              'proofType', 'targetTimeLabel', 'targetEffort', 'updatedAt'
+                            ])) ||
+                           (existing().status in ['DRAFT', 'SEALED'] &&
+                            incoming().status in ['SEALED', 'ACTIVE'] &&
+                            incoming().diff(existing()).affectedKeys().hasOnly([
+                              'status', 'orderIndex', 'deadlineEpochMs', 'updatedAt'
+                            ])) ||
+                           (existing().status in ['ACTIVE', 'SEALED'] &&
+                            incoming().status in ['COMPLETED', 'BREACHED'] &&
+                            incoming().diff(existing()).affectedKeys().hasOnly([
+                              'status', 'proofSummary', 'proofPhotoUri', 'debtPenaltyMinutes',
+                              'penaltyApplied', 'updatedAt'
+                            ])) ||
+                           (existing().status == 'ACTIVE' &&
+                            incoming().status == 'ACTIVE' &&
+                            incoming().penaltyApplied == true &&
+                            incoming().diff(existing()).affectedKeys().hasOnly([
+                              'penaltyApplied', 'debtPenaltyMinutes', 'updatedAt'
+                            ]))
+                         );
+
+        allow delete: if isValidId(userId) &&
+                         isValidId(taskId) &&
+                         isOwner(userId) &&
+                         existing().status == 'DRAFT';
+      }
+
+      // 3. Immutable Honor & Photo Ledger
+      match /ledger/{entryId} {
+        allow get: if isValidId(userId) && isValidId(entryId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId);
+
+        allow create: if isValidId(userId) &&
+                         isValidId(entryId) &&
+                         isOwner(userId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'taskId', 'taskTitle', 'eventType',
+                           'proofType', 'proofNote', 'scoreDelta', 'debtMinutesDelta', 'createdAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'taskId', 'taskTitle', 'eventType',
+                           'proofType', 'proofNote', 'proofPhotoUri',
+                           'scoreDelta', 'debtMinutesDelta', 'createdAt'
+                         ]) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         isValidLedgerEntry(incoming());
+
+        allow update: if false;
+        allow delete: if false;
+      }
+    }
+  }
+}

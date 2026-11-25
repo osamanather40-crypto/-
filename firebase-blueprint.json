@@ -1,0 +1,136 @@
+{
+  "entities": {
+    "UserDisciplineProfile": {
+      "title": "UserDisciplineProfile",
+      "description": "Authenticated user's discipline state, sovereignty index, restrictions, and WhatsApp witness.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "displayName": { "type": "string", "description": "Display name from Google account." },
+        "sovereigntyScore": { "type": "integer", "description": "Discipline score between 0 and 1000." },
+        "zeroBreachStreak": { "type": "integer", "description": "Consecutive tasks completed without breach." },
+        "timeDebtMinutes": { "type": "integer", "description": "Accumulated penalty time debt in minutes." },
+        "completedCount": { "type": "integer", "description": "Total completed tasks." },
+        "breachCount": { "type": "integer", "description": "Total breached tasks." },
+        "sealedContractDate": { "type": "string", "description": "Optional YYYY-MM-DD date when today's contract was sealed." },
+        "restrictedMode": { "type": "boolean", "description": "Optional flag indicating active restrictions due to missing photo proof." },
+        "restrictionReason": { "type": "string", "description": "Optional description of active restriction." },
+        "witnessName": { "type": "string", "description": "Optional designated WhatsApp accountability partner name." },
+        "witnessPhone": { "type": "string", "description": "Optional designated WhatsApp phone number with country code." },
+        "autoWhatsApp": { "type": "boolean", "description": "Optional flag to launch WhatsApp automatically on photo proof." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last update." }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "sovereigntyScore",
+        "zeroBreachStreak",
+        "timeDebtMinutes",
+        "completedCount",
+        "breachCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "QaydTask": {
+      "title": "QaydTask",
+      "description": "A mandatory sequential execution task requiring photo proof by a specific target time.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "title": { "type": "string", "description": "Task title." },
+        "description": { "type": "string", "description": "Detailed execution specification." },
+        "orderIndex": { "type": "integer", "description": "Strict sequential order index." },
+        "durationMinutes": { "type": "integer", "description": "Execution window duration in minutes (1..1440)." },
+        "proofType": {
+          "type": "string",
+          "enum": ["PHOTO_PROOF", "PRESS_OATH", "STILLNESS_MONK", "KINETIC_MOTION", "VISUAL_EVIDENCE"],
+          "description": "Mandatory photo verification gate."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["DRAFT", "SEALED", "ACTIVE", "COMPLETED", "BREACHED"],
+          "description": "Current tunnel-lock lifecycle status."
+        },
+        "contractDate": { "type": "string", "description": "YYYY-MM-DD date of the daily contract." },
+        "targetTimeLabel": { "type": "string", "description": "Target completion time label chosen by user (e.g. 14:30)." },
+        "targetEffort": { "type": "integer", "description": "Required proof count." },
+        "deadlineEpochMs": { "type": "integer", "description": "Deadline epoch milliseconds once activated (0 before activation)." },
+        "proofSummary": { "type": "string", "description": "Optional execution proof caption or breach reason." },
+        "proofPhotoUri": { "type": "string", "description": "Optional persisted local path/URI of the proof photo." },
+        "debtPenaltyMinutes": { "type": "integer", "description": "Overdue or breach penalty minutes applied." },
+        "recoveryTask": { "type": "boolean", "description": "Whether this task is a mandatory penalty recovery task." },
+        "penaltyApplied": { "type": "boolean", "description": "Whether automatic timeout punishment has already been recorded." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of creation." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last update." }
+      },
+      "required": [
+        "userId",
+        "title",
+        "description",
+        "orderIndex",
+        "durationMinutes",
+        "proofType",
+        "status",
+        "contractDate",
+        "targetEffort",
+        "deadlineEpochMs",
+        "debtPenaltyMinutes",
+        "recoveryTask",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LedgerEntry": {
+      "title": "LedgerEntry",
+      "description": "Append-only immutable audit log of contracts, photo-verified completions, and punishments.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "taskId": { "type": "string", "description": "Related task ID or contract marker." },
+        "taskTitle": { "type": "string", "description": "Snapshot of the task title." },
+        "eventType": {
+          "type": "string",
+          "enum": ["CONTRACT_SEALED", "TASK_COMPLETED", "TASK_BREACHED", "DEBT_REPAID", "FORCE_MAJEURE"],
+          "description": "Immutable event classification."
+        },
+        "proofType": {
+          "type": "string",
+          "enum": ["PHOTO_PROOF", "PRESS_OATH", "STILLNESS_MONK", "KINETIC_MOTION", "VISUAL_EVIDENCE", "SYSTEM"],
+          "description": "Proof method used."
+        },
+        "proofNote": { "type": "string", "description": "Recorded photo caption or punishment justification." },
+        "proofPhotoUri": { "type": "string", "description": "Optional persisted local path/URI of the proof photo." },
+        "scoreDelta": { "type": "integer", "description": "Change applied to sovereignty score." },
+        "debtMinutesDelta": { "type": "integer", "description": "Change applied to time debt." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp of creation." }
+      },
+      "required": [
+        "userId",
+        "taskId",
+        "taskTitle",
+        "eventType",
+        "proofType",
+        "proofNote",
+        "scoreDelta",
+        "debtMinutesDelta",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserDisciplineProfile" },
+      "description": "User discipline profile, WhatsApp witness, and restriction state."
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/QaydTask" },
+      "description": "Mandatory sequential daily tasks with target time, photo proof, and punishment flag."
+    },
+    "/users/{userId}/ledger/{entryId}": {
+      "schema": { "$ref": "#/entities/LedgerEntry" },
+      "description": "Immutable audit ledger of photo proofs and automatic punishments."
+    }
+  }
+}

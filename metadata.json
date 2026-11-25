@@ -1,0 +1,6 @@
+{
+  "name": "قيد الإلزام",
+  "description": "نظام تنفيذ يومي إجباري بآليات قفل تسلسلي، براهين إنجاز فيزيائية، عقود غير قابلة للتعديل، ومؤشر سيادة للانضباط الصارم.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

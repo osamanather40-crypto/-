@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">قيد الإلزام</string>
+    <string name="app_tagline">ميثاق التنفيذ المصوّر</string>
+    <string name="sign_in_google">الدخول بحساب Google</string>
+    <string name="nav_chamber">الإلزام</string>
+    <string name="nav_gallery">سجل الصور</string>
+    <string name="nav_ledger">السجل</string>
+    <string name="nav_protocol">القيود</string>
+    <string name="cd_auth_hero">صورة بوابة الانضباط المظلمة</string>
+    <string name="cd_empty_vault">ختم الميثاق اليومي الفارغ</string>
+    <string name="cd_seal_lock">قفل الميثاق التسلسلي</string>
+    <string name="cd_proof_photo">صورة البرهان الموثق</string>
+</resources>
